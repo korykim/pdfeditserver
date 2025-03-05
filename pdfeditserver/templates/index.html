@@ -1,0 +1,848 @@
+{% extends "base.html" %}
+
+{% block title %}PDF编辑服务器 - 删除PDF页面{% endblock %}
+
+{% block head %}
+<style>
+    .drag-active {
+        border-color: #0ea5e9;
+        background-color: #f0f9ff;
+    }
+    
+    /* 优化标题和文本样式 */
+    .text-2xl {
+        letter-spacing: 0.03em;
+    }
+    
+    .step-title {
+        font-weight: 500;
+        letter-spacing: 0.02em;
+    }
+    
+    /* 优化按钮文本 */
+    button, .button-text {
+        font-weight: 500;
+        letter-spacing: 0.02em;
+    }
+    
+    /* 优化提示文本 */
+    .hint-text {
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div class="px-4 py-5 sm:px-6">
+        <h2 class="text-2xl font-bold leading-7 text-gray-900">PDF页面删除工具</h2>
+        <p class="mt-1 max-w-2xl text-sm text-gray-500 hint-text">上传PDF文件并选择要删除的页面</p>
+    </div>
+
+    <!-- 步骤指示器 -->
+    <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-center mb-8">
+            <div class="flex items-center relative">
+                <!-- 步骤1：上传文件 -->
+                <div id="step-1" class="flex flex-col items-center">
+                    <div class="w-10 h-10 bg-primary-600 text-white rounded-full flex items-center justify-center font-bold">1</div>
+                    <div class="text-sm font-medium text-gray-900 mt-2 step-title">上传文件</div>
+                </div>
+                <!-- 连接线 -->
+                <div class="w-24 h-1 bg-gray-300 mx-2" id="line-1-2"></div>
+                <!-- 步骤2：选择页面 -->
+                <div id="step-2" class="flex flex-col items-center opacity-50">
+                    <div class="w-10 h-10 bg-gray-300 text-white rounded-full flex items-center justify-center font-bold">2</div>
+                    <div class="text-sm font-medium text-gray-500 mt-2 step-title">选择页面</div>
+                </div>
+                <!-- 连接线 -->
+                <div class="w-24 h-1 bg-gray-300 mx-2" id="line-2-3"></div>
+                <!-- 步骤3：处理文件 -->
+                <div id="step-3" class="flex flex-col items-center opacity-50">
+                    <div class="w-10 h-10 bg-gray-300 text-white rounded-full flex items-center justify-center font-bold">3</div>
+                    <div class="text-sm font-medium text-gray-500 mt-2 step-title">处理文件</div>
+                </div>
+                <!-- 连接线 -->
+                <div class="w-24 h-1 bg-gray-300 mx-2" id="line-3-4"></div>
+                <!-- 步骤4：下载结果 -->
+                <div id="step-4" class="flex flex-col items-center opacity-50">
+                    <div class="w-10 h-10 bg-gray-300 text-white rounded-full flex items-center justify-center font-bold">4</div>
+                    <div class="text-sm font-medium text-gray-500 mt-2 step-title">下载结果</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步骤内容区域 -->
+        <div id="step-content" class="mt-6">
+            <!-- 步骤1：上传文件 -->
+            <div id="step-1-content" class="block">
+                <div id="upload-area" class="max-w-lg mx-auto mt-5 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary-400 transition-colors cursor-pointer">
+                    <div class="space-y-1 text-center">
+                        <i class="fas fa-file-pdf text-gray-400 text-5xl mb-3"></i>
+                        <div class="flex text-sm text-gray-600">
+                            <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none">
+                                <span>上传PDF文件</span>
+                                <input id="file-upload" name="file" type="file" class="sr-only" accept=".pdf">
+                            </label>
+                            <p class="pl-1">或拖放文件到此处</p>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            仅支持PDF文件，最大16MB
+                        </p>
+                    </div>
+                </div>
+                <div id="upload-progress" class="hidden max-w-lg mx-auto mt-4">
+                    <div class="bg-gray-200 rounded-full h-2.5">
+                        <div id="upload-progress-bar" class="bg-primary-600 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="upload-status" class="text-sm text-gray-500 mt-2 text-center">正在上传...</p>
+                </div>
+                <div id="upload-error" class="hidden max-w-lg mx-auto mt-4 text-center text-red-500"></div>
+            </div>
+
+            <!-- 步骤2：选择页面 -->
+            <div id="step-2-content" class="hidden">
+                <div class="max-w-lg mx-auto">
+                    <div class="bg-primary-50 p-4 rounded-md mb-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-primary-600"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-primary-800">文件信息</h3>
+                                <div class="mt-2 text-sm text-primary-700">
+                                    <p id="file-info">文件名：<span id="file-name"></span></p>
+                                    <p>总页数：<span id="total-pages">加载中...</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6 bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                        <div class="flex items-center mb-3">
+                            <i class="fas fa-scissors text-primary-600 mr-2 text-xl"></i>
+                            <label for="pages-to-delete" class="text-base font-medium text-gray-800">要删除的页面</label>
+                        </div>
+                        
+                        <div class="mt-2 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-list-ol text-gray-400"></i>
+                            </div>
+                            <input type="text" name="pages-to-delete" id="pages-to-delete" 
+                                class="pl-10 shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full text-base border-gray-300 rounded-md" 
+                                placeholder="例如：1,3,5-7">
+                        </div>
+                        
+                        <div class="mt-3 bg-yellow-50 p-3 rounded-md border-l-4 border-yellow-400">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-lightbulb text-yellow-500"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-yellow-700 font-medium">输入格式说明：</p>
+                                    <ul class="list-disc ml-5 mt-1 space-y-1 text-sm text-yellow-700">
+                                        <li>用<strong>逗号</strong>分隔单个页码，如 <code class="bg-yellow-100 px-1 rounded">1,3,7</code></li>
+                                        <li>用<strong>连字符</strong>表示范围，如 <code class="bg-yellow-100 px-1 rounded">5-7</code> 表示第5、6、7页</li>
+                                        <li>可以混合使用，如 <code class="bg-yellow-100 px-1 rounded">1,3,5-7</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 页码预览 -->
+                        <div id="pages-preview" class="mt-4 hidden">
+                            <p class="text-sm font-medium text-gray-700 mb-2">已选择的页面：</p>
+                            <div id="selected-pages" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button id="process-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 button-text">
+                            处理文件
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤3：处理文件 -->
+            <div id="step-3-content" class="hidden">
+                <div class="max-w-lg mx-auto text-center">
+                    <div class="animate-bounce-slow mb-4">
+                        <i class="fas fa-cogs text-primary-600 text-5xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900">正在处理您的PDF文件</h3>
+                    <p class="mt-1 text-sm text-gray-500">请稍候，这可能需要几秒钟...</p>
+                    <p id="processStatus" class="mt-2 text-sm text-primary-600"></p>
+                    
+                    <div class="mt-6">
+                        <div class="bg-gray-200 rounded-full h-2.5">
+                            <div id="process-progress-bar" class="bg-primary-600 h-2.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤4：下载结果 -->
+            <div id="step-4-content" class="hidden">
+                <div class="max-w-lg mx-auto text-center">
+                    <div class="mb-4 text-green-500">
+                        <i class="fas fa-check-circle text-6xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900">处理完成！</h3>
+                    <div id="result-info" class="mt-2 text-sm text-gray-500">
+                        <p>原PDF总页数：<span id="result-total-pages"></span></p>
+                        <p>删除页数：<span id="result-pages-deleted"></span></p>
+                        <p>保留页数：<span id="result-pages-kept"></span></p>
+                    </div>
+                    
+                    <!-- 优化按钮布局：使用卡片分隔不同功能的按钮 -->
+                    <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <!-- 下载文件卡片 -->
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="px-4 py-5 sm:p-6">
+                                <div class="text-center">
+                                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 mb-4">
+                                        <i class="fas fa-download text-primary-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-sm font-medium text-gray-900 mb-2">下载处理后的文件</h3>
+                                    <p class="text-xs text-gray-500 mb-4">点击下方按钮获取处理完成的PDF</p>
+                                    <a id="download-link" href="#" class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 button-text">
+                                        <i class="fas fa-download mr-2"></i> 下载文件
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 处理新文件卡片 -->
+                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg">
+                            <div class="px-4 py-5 sm:p-6">
+                                <div class="text-center">
+                                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-200 mb-4">
+                                        <i class="fas fa-redo text-gray-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-sm font-medium text-gray-700 mb-2">处理新文件</h3>
+                                    <p class="text-xs text-gray-500 mb-4">返回上传页面处理其他PDF文件</p>
+                                    <button id="restart-btn" class="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 button-text">
+                                        <i class="fas fa-redo mr-2"></i> 处理新文件
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 错误信息 -->
+            <div id="error-content" class="hidden">
+                <div class="max-w-lg mx-auto text-center">
+                    <div class="mb-4 text-red-500">
+                        <i class="fas fa-exclamation-circle text-6xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900">处理过程中出错</h3>
+                    <p id="error-message" class="mt-2 text-sm text-red-500 mb-6"></p>
+                    
+                    <!-- 使用卡片布局，与成功页面保持一致 -->
+                    <div class="mt-4">
+                        <div class="bg-gray-50 overflow-hidden shadow rounded-lg max-w-md mx-auto">
+                            <div class="px-4 py-5 sm:p-6">
+                                <div class="text-center">
+                                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-200 mb-4">
+                                        <i class="fas fa-redo text-gray-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-sm font-medium text-gray-700 mb-2">重新开始</h3>
+                                    <p class="text-xs text-gray-500 mb-4">返回上传页面重新尝试</p>
+                                    <button id="error-restart-btn" class="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 button-text">
+                                        <i class="fas fa-redo mr-2"></i> 重新开始
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 全局变量
+    let currentTaskId = null;
+    let statusCheckInterval = null;
+    let totalPages = 0;
+    let isPdfInfoRequest = false; // 添加标志变量，用于区分PDF信息请求和处理请求
+
+    // DOM元素
+    const uploadArea = document.getElementById('upload-area');
+    const fileUpload = document.getElementById('file-upload');
+    const uploadProgress = document.getElementById('upload-progress');
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadStatus = document.getElementById('upload-status');
+    const uploadError = document.getElementById('upload-error');
+    const fileName = document.getElementById('file-name');
+    const totalPagesElement = document.getElementById('total-pages');
+    const pagesToDelete = document.getElementById('pages-to-delete');
+    const processBtn = document.getElementById('process-btn');
+    const downloadLink = document.getElementById('download-link');
+    const restartBtn = document.getElementById('restart-btn');
+    const errorRestartBtn = document.getElementById('error-restart-btn');
+    const resultTotalPages = document.getElementById('result-total-pages');
+    const resultPagesDeleted = document.getElementById('result-pages-deleted');
+    const resultPagesKept = document.getElementById('result-pages-kept');
+    const errorMessage = document.getElementById('error-message');
+    const processProgressBar = document.getElementById('process-progress-bar');
+
+    // 步骤元素
+    const steps = {
+        1: {
+            indicator: document.getElementById('step-1'),
+            content: document.getElementById('step-1-content')
+        },
+        2: {
+            indicator: document.getElementById('step-2'),
+            content: document.getElementById('step-2-content')
+        },
+        3: {
+            indicator: document.getElementById('step-3'),
+            content: document.getElementById('step-3-content')
+        },
+        4: {
+            indicator: document.getElementById('step-4'),
+            content: document.getElementById('step-4-content')
+        },
+        error: {
+            content: document.getElementById('error-content')
+        }
+    };
+
+    const lines = {
+        '1-2': document.getElementById('line-1-2'),
+        '2-3': document.getElementById('line-2-3'),
+        '3-4': document.getElementById('line-3-4')
+    };
+
+    // 显示指定步骤
+    function showStep(stepNumber) {
+        // 隐藏所有步骤内容
+        Object.values(steps).forEach(step => {
+            if (step.content) {
+                step.content.classList.add('hidden');
+            }
+            if (step.indicator) {
+                step.indicator.classList.add('opacity-50');
+                const stepCircle = step.indicator.querySelector('div:first-child');
+                stepCircle.classList.remove('bg-primary-600');
+                stepCircle.classList.add('bg-gray-300');
+                
+                const stepText = step.indicator.querySelector('div:last-child');
+                stepText.classList.remove('text-gray-900');
+                stepText.classList.add('text-gray-500');
+            }
+        });
+
+        // 重置所有连接线
+        Object.values(lines).forEach(line => {
+            line.classList.remove('bg-primary-600');
+            line.classList.add('bg-gray-300');
+        });
+
+        // 显示当前步骤内容
+        if (stepNumber === 'error') {
+            steps.error.content.classList.remove('hidden');
+            return;
+        }
+
+        steps[stepNumber].content.classList.remove('hidden');
+        
+        // 更新步骤指示器
+        for (let i = 1; i <= stepNumber; i++) {
+            steps[i].indicator.classList.remove('opacity-50');
+            const stepCircle = steps[i].indicator.querySelector('div:first-child');
+            stepCircle.classList.remove('bg-gray-300');
+            stepCircle.classList.add('bg-primary-600');
+            
+            const stepText = steps[i].indicator.querySelector('div:last-child');
+            stepText.classList.remove('text-gray-500');
+            stepText.classList.add('text-gray-900');
+            
+            // 更新连接线
+            if (i < stepNumber) {
+                lines[`${i}-${i+1}`].classList.remove('bg-gray-300');
+                lines[`${i}-${i+1}`].classList.add('bg-primary-600');
+            }
+        }
+    }
+
+    // 解析页面范围
+    function parsePageRanges(input, maxPages) {
+        if (!input.trim()) {
+            return [];
+        }
+        
+        const pages = new Set();
+        const ranges = input.split(',');
+        
+        for (const range of ranges) {
+            const trimmedRange = range.trim();
+            if (!trimmedRange) continue;
+            
+            if (trimmedRange.includes('-')) {
+                // 处理范围，如 "5-7"
+                const [start, end] = trimmedRange.split('-').map(num => parseInt(num.trim(), 10));
+                
+                if (isNaN(start) || isNaN(end)) {
+                    throw new Error(`无效的页面范围: ${trimmedRange}`);
+                }
+                
+                if (start > end) {
+                    throw new Error(`无效的页面范围: ${trimmedRange}，起始页大于结束页`);
+                }
+                
+                if (start < 1 || end > maxPages) {
+                    throw new Error(`页面范围 ${trimmedRange} 超出有效范围 (1-${maxPages})`);
+                }
+                
+                for (let i = start; i <= end; i++) {
+                    pages.add(i);
+                }
+            } else {
+                // 处理单个页面，如 "3"
+                const page = parseInt(trimmedRange, 10);
+                
+                if (isNaN(page)) {
+                    throw new Error(`无效的页面号: ${trimmedRange}`);
+                }
+                
+                if (page < 1 || page > maxPages) {
+                    throw new Error(`页面号 ${page} 超出有效范围 (1-${maxPages})`);
+                }
+                
+                pages.add(page);
+            }
+        }
+        
+        return Array.from(pages).sort((a, b) => a - b);
+    }
+
+    // 更新页码预览
+    function updatePagesPreview() {
+        const input = pagesToDelete.value.trim();
+        const previewContainer = document.getElementById('pages-preview');
+        const selectedPagesContainer = document.getElementById('selected-pages');
+        
+        if (!input) {
+            previewContainer.classList.add('hidden');
+            return;
+        }
+        
+        try {
+            const selectedPages = parsePageRanges(input, totalPages);
+            
+            if (selectedPages.length === 0) {
+                previewContainer.classList.add('hidden');
+                return;
+            }
+            
+            // 清空预览容器
+            selectedPagesContainer.innerHTML = '';
+            
+            // 添加页码标签
+            selectedPages.forEach(page => {
+                const pageTag = document.createElement('span');
+                pageTag.className = 'bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-1 rounded-full';
+                pageTag.textContent = `第 ${page} 页`;
+                selectedPagesContainer.appendChild(pageTag);
+            });
+            
+            // 显示预览容器
+            previewContainer.classList.remove('hidden');
+        } catch (error) {
+            previewContainer.classList.add('hidden');
+        }
+    }
+
+    // 上传文件
+    function uploadFile(file) {
+        // 显示上传进度
+        uploadProgress.classList.remove('hidden');
+        uploadError.classList.add('hidden');
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = Math.round((event.loaded / event.total) * 100);
+                uploadProgressBar.style.width = percentComplete + '%';
+                uploadStatus.textContent = `上传中... ${percentComplete}%`;
+            }
+        });
+        
+        xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+                const response = JSON.parse(xhr.responseText);
+                currentTaskId = response.task_id;
+                
+                console.log("文件上传成功，任务ID:", currentTaskId);
+                
+                // 更新文件信息
+                fileName.textContent = file.name;
+                
+                // 转到步骤2
+                showStep(2);
+                
+                // 设置标志，表示这是获取PDF信息的请求
+                isPdfInfoRequest = true;
+                
+                // 显示加载状态
+                totalPagesElement.textContent = "加载中...";
+                
+                // 发送一个空的页面删除请求来获取PDF信息
+                console.log("发送PDF信息请求...");
+                fetch('/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        task_id: currentTaskId,
+                        pages_to_delete: []
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('获取PDF信息失败');
+                    }
+                    console.log("PDF信息请求已发送，等待处理...");
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("收到PDF信息请求响应:", data);
+                    
+                    // 处理响应
+                    if (data.status === 'completed' && data.total_pages !== undefined) {
+                        // 直接从响应中获取总页数
+                        console.log("响应中包含总页数:", data.total_pages);
+                        totalPages = data.total_pages;
+                        totalPagesElement.textContent = totalPages;
+                        isPdfInfoRequest = false;
+                        updatePagesPreview();
+                    } else if (data.status === 'processing') {
+                        // 如果状态是处理中，开始轮询状态
+                        console.log("响应状态为处理中，开始轮询状态...");
+                        checkTaskStatus();
+                    } else if (data.status === 'failed') {
+                        // 处理失败
+                        console.error("获取PDF信息失败:", data.error);
+                        totalPagesElement.textContent = "获取失败";
+                        isPdfInfoRequest = false;
+                        showError(data.error || '处理失败');
+                    } else {
+                        // 其他情况，开始轮询状态
+                        console.log("未知状态，开始轮询状态...");
+                        checkTaskStatus();
+                    }
+                })
+                .catch(error => {
+                    console.error('获取PDF信息失败', error);
+                    totalPagesElement.textContent = "获取失败";
+                    showError('获取PDF信息失败: ' + error.message);
+                });
+            } else {
+                let errorMsg = '上传失败';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    errorMsg = response.error || errorMsg;
+                } catch (e) {
+                    console.error('解析错误响应失败', e);
+                }
+                
+                uploadProgress.classList.add('hidden');
+                uploadError.classList.remove('hidden');
+                uploadError.textContent = errorMsg;
+            }
+        });
+        
+        xhr.addEventListener('error', () => {
+            uploadProgress.classList.add('hidden');
+            uploadError.classList.remove('hidden');
+            uploadError.textContent = '网络错误，上传失败';
+        });
+        
+        xhr.open('POST', '/upload');
+        xhr.send(formData);
+    }
+
+    // 检查任务状态
+    function checkTaskStatus() {
+        if (!currentTaskId) return;
+        
+        // 清除之前的定时器
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+        }
+        
+        console.log("开始轮询任务状态...");
+        
+        // 添加超时计数器
+        let timeoutCounter = 0;
+        const maxTimeout = 30; // 最大超时次数（30秒）
+        
+        // 设置新的定时器
+        statusCheckInterval = setInterval(() => {
+            console.log(`检查任务状态: ${currentTaskId}, isPdfInfoRequest=${isPdfInfoRequest}, 超时计数=${timeoutCounter}`);
+            
+            // 检查是否超时
+            if (timeoutCounter >= maxTimeout) {
+                console.error("状态检查超时");
+                clearInterval(statusCheckInterval);
+                
+                if (isPdfInfoRequest) {
+                    totalPagesElement.textContent = "获取超时";
+                    isPdfInfoRequest = false;
+                }
+                
+                showError('处理超时，请重试');
+                return;
+            }
+            
+            // 增加超时计数
+            timeoutCounter++;
+            
+            fetch(`/status/${currentTaskId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('获取任务状态失败');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("状态检查响应:", data);
+                    
+                    // 重置超时计数器，因为收到了响应
+                    timeoutCounter = 0;
+                    
+                    // 首先检查是否有total_pages信息
+                    if (data.total_pages !== undefined) {
+                        console.log(`收到总页数信息: ${data.total_pages}`);
+                        totalPages = data.total_pages;
+                        totalPagesElement.textContent = totalPages;
+                        
+                        // 如果是PDF信息请求且已获取到页数，可以结束轮询
+                        if (isPdfInfoRequest && data.status === 'completed') {
+                            console.log("PDF信息请求完成，停止轮询");
+                            isPdfInfoRequest = false;
+                            clearInterval(statusCheckInterval);
+                            updatePagesPreview();
+                            return;
+                        }
+                    } else {
+                        console.log("响应中没有总页数信息");
+                    }
+
+                    // 处理不同的状态
+                    switch (data.status) {
+                        case 'completed':
+                            console.log("任务已完成");
+                            clearInterval(statusCheckInterval);
+                            if (!isPdfInfoRequest) {
+                                // 处理PDF编辑完成的情况
+                                resultTotalPages.textContent = data.total_pages || totalPages;
+                                resultPagesDeleted.textContent = data.pages_deleted;
+                                resultPagesKept.textContent = data.pages_kept;
+                                downloadLink.href = data.download_url;
+                                showStep(4);
+                            } else {
+                                // 如果是PDF信息请求，标记为完成
+                                isPdfInfoRequest = false;
+                                updatePagesPreview();
+                            }
+                            break;
+                            
+                        case 'processing':
+                            console.log("任务处理中");
+                            // 更新进度条
+                            const currentWidth = parseInt(processProgressBar.style.width) || 0;
+                            if (currentWidth < 90) {
+                                processProgressBar.style.width = (currentWidth + 10) + '%';
+                            }
+                            break;
+                            
+                        case 'failed':
+                            console.log("任务失败:", data.error);
+                            clearInterval(statusCheckInterval);
+                            if (isPdfInfoRequest) {
+                                totalPagesElement.textContent = "获取失败";
+                                isPdfInfoRequest = false;
+                            }
+                            showError(data.error || '处理失败');
+                            break;
+                            
+                        case 'retrying':
+                            console.log(`任务重试中: ${data.retry_count}/3`);
+                            const retryMessage = `正在重试 (${data.retry_count}/3): ${data.error}`;
+                            document.getElementById('processStatus').textContent = retryMessage;
+                            // 更新进度条
+                            const retryWidth = parseInt(processProgressBar.style.width) || 0;
+                            if (retryWidth > 30) {
+                                processProgressBar.style.width = (retryWidth - 20) + '%';
+                            }
+                            break;
+                            
+                        default:
+                            console.log(`未知状态: ${data.status}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('检查任务状态失败', error);
+                    
+                    // 不要立即清除定时器，让它继续尝试
+                    // 但如果连续失败多次，可以考虑清除
+                    if (++timeoutCounter >= 5) {
+                        clearInterval(statusCheckInterval);
+                        
+                        if (isPdfInfoRequest) {
+                            totalPagesElement.textContent = "获取失败";
+                            isPdfInfoRequest = false;
+                        }
+                        
+                        showError('检查任务状态失败: ' + error.message);
+                    }
+                });
+        }, 1000);
+    }
+
+    // 处理PDF
+    function processPdf() {
+        try {
+            // 解析要删除的页面
+            const pagesToDeleteValue = pagesToDelete.value.trim();
+            if (!pagesToDeleteValue) {
+                alert('请输入要删除的页面');
+                return;
+            }
+            
+            const pagesToDeleteArray = parsePageRanges(pagesToDeleteValue, totalPages);
+            
+            // 转到步骤3
+            showStep(3);
+            
+            // 重置进度条
+            processProgressBar.style.width = '0%';
+            
+            // 确保这不是PDF信息请求
+            isPdfInfoRequest = false;
+            
+            // 发送处理请求
+            fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    task_id: currentTaskId,
+                    pages_to_delete: pagesToDeleteArray
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('处理请求失败');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 开始检查状态
+                checkTaskStatus();
+                
+                // 模拟进度条动画
+                processProgressBar.style.width = '10%';
+            })
+            .catch(error => {
+                console.error('处理PDF失败', error);
+                showError('处理PDF失败: ' + error.message);
+            });
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // 显示错误
+    function showError(message) {
+        errorMessage.textContent = message;
+        showStep('error');
+    }
+
+    // 重新开始
+    function restart() {
+        // 清除当前任务
+        currentTaskId = null;
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            statusCheckInterval = null;
+        }
+        
+        // 重置标志变量
+        isPdfInfoRequest = false;
+        
+        // 重置表单
+        fileUpload.value = '';
+        pagesToDelete.value = '';
+        uploadProgressBar.style.width = '0%';
+        uploadProgress.classList.add('hidden');
+        uploadError.classList.add('hidden');
+        
+        // 返回步骤1
+        showStep(1);
+    }
+
+    // 事件监听器
+    document.addEventListener('DOMContentLoaded', () => {
+        // 文件上传事件
+        fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        });
+        
+        // 拖放事件
+        uploadArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            uploadArea.classList.add('drag-active');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-active');
+        });
+        
+        uploadArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            uploadArea.classList.remove('drag-active');
+            
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                if (file.type === 'application/pdf') {
+                    uploadFile(file);
+                } else {
+                    uploadError.classList.remove('hidden');
+                    uploadError.textContent = '只能上传PDF文件';
+                }
+            }
+        });
+        
+        // 处理按钮点击事件
+        processBtn.addEventListener('click', processPdf);
+        
+        // 重新开始按钮点击事件
+        restartBtn.addEventListener('click', restart);
+        errorRestartBtn.addEventListener('click', restart);
+        
+        // 页码输入框事件
+        pagesToDelete.addEventListener('input', updatePagesPreview);
+        pagesToDelete.addEventListener('focus', updatePagesPreview);
+    });
+</script>
+{% endblock %} 
