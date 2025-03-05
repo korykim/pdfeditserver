@@ -1,0 +1,50 @@
+# Python编译文件
+*.py[cod]
+__pycache__/
+*.so
+
+# 包和发布文件
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# 日志文件
+*.log
+logs/
+
+# 单元测试和覆盖率报告
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# IDE相关
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 环境相关
+.env
+.venv
+venv/
+ENV/
+env/
+
+# 项目特定文件
+.pid
+*.pdf  # PDF文件（如果不需要版本控制） 
