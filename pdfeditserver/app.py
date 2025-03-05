@@ -42,7 +42,7 @@ print(f"应用中的上传目录路径: {app.config['UPLOAD_FOLDER']}")
 def allowed_file(filename):
     """检查文件扩展名是否允许上传"""
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+        filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 @app.route('/')
 def index():

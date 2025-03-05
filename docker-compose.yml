@@ -1,0 +1,80 @@
+
+
+services:
+  # Nginx服务
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./pdfeditserver/static:/app/pdfeditserver/static:ro
+      - ./pdfeditserver/uploads:/app/pdfeditserver/uploads:ro
+    depends_on:
+      - app
+    networks:
+      - pdf_network
+    restart: unless-stopped
+
+  # Flask应用服务
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: gunicorn --workers 4 --bind 0.0.0.0:8000 --timeout 120 --worker-class gthread --threads 2 pdfeditserver.app:app
+    volumes:
+      - ./pdfeditserver:/app/pdfeditserver:ro
+      - ./pdfeditserver/uploads:/app/pdfeditserver/uploads
+      - ./pdfeditserver/static:/app/pdfeditserver/static
+    environment:
+      - REDIS_URL=redis://pdfedit_redis:6379/0
+      - CELERY_BROKER_URL=redis://pdfedit_redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://pdfedit_redis:6379/2
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    depends_on:
+      - pdfedit_redis
+    networks:
+      - pdf_network
+    restart: unless-stopped
+
+  # Redis服务
+  pdfedit_redis:
+    image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - pdf_network
+    restart: unless-stopped
+
+  # Celery Worker服务
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: supervisord -n -c /etc/supervisor/supervisord.conf
+    volumes:
+      - ./pdfeditserver:/app/pdfeditserver:ro
+      - ./pdfeditserver/uploads:/app/pdfeditserver/uploads
+      - ./supervisord.conf:/etc/supervisor/supervisord.conf:ro
+      - /var/log/supervisor:/var/log/supervisor
+    environment:
+      - REDIS_URL=redis://pdfedit_redis:6379/0
+      - CELERY_BROKER_URL=redis://pdfedit_redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://pdfedit_redis:6379/2
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+    depends_on:
+      - pdfedit_redis
+    networks:
+      - pdf_network
+    restart: unless-stopped
+
+networks:
+  pdf_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local

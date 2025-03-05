@@ -19,60 +19,121 @@
 - PDF处理：PyPDF2
 - 任务队列：Celery
 - 消息代理：Redis
+- Web服务器：Nginx + Gunicorn
+- 容器化：Docker & Docker Compose
+- 进程管理：Supervisor
 
 ## 安装与运行
 
-### 前提条件
+### 方式一：Docker部署（推荐）
+
+1. 确保安装了Docker和Docker Compose
+   ```bash
+   docker --version
+   docker-compose --version
+   ```
+
+2. 克隆仓库
+   ```bash
+   git clone <repository-url>
+   cd pdfeditserver
+   ```
+
+3. 创建环境变量文件
+   ```bash
+   cp pdfeditserver/.env.example pdfeditserver/.env
+   # 编辑.env文件设置必要的环境变量
+   ```
+
+4. 构建和启动服务
+   ```bash
+   docker-compose build --no-cache
+
+   docker-compose up -d
+   ```
+
+5. 访问服务
+   ```
+   http://localhost
+   ```
+
+6. 查看日志
+   ```bash
+   # 查看所有服务日志
+   docker-compose logs -f
+   
+   # 查看特定服务日志
+   docker-compose logs -f app
+   docker-compose logs -f celery
+   ```
+
+7. 停止服务
+   ```bash
+   docker-compose down
+   ```
+
+### 方式二：传统部署
+
+#### 前提条件
 
 - Python 3.7+
 - pip (Python包管理器)
 - Redis服务器
+- Nginx
+- Supervisor
 
-### 安装步骤
+#### 安装步骤
 
-1. 克隆或下载本仓库
-
-2. 安装依赖
+1. 克隆仓库并安装依赖
    ```bash
+   git clone <repository-url>
+   cd pdfeditserver
    pip install -r requirements.txt
    ```
 
-3. 启动Redis服务器
+2. 配置环境变量
    ```bash
-   # 如果使用Docker
-   docker run -d -p 6379:6379 redis
+   cp pdfeditserver/.env.example pdfeditserver/.env
+   # 编辑.env文件设置环境变量
+   ```
+
+3. 配置Nginx
+   - 将`nginx.conf`复制到Nginx配置目录
+   - 重启Nginx服务
+
+4. 配置Supervisor
+   - 将`supervisord.conf`复制到Supervisor配置目录
+   - 更新配置中的路径
+   - 重启Supervisor服务
+
+5. 启动服务
+   ```bash
+   # Supervisor会自动管理Celery进程
+   supervisorctl start all
    
-   # 或者使用本地安装的Redis
-   redis-server
+   # 启动Gunicorn
+   gunicorn --workers 4 --bind 0.0.0.0:8000 pdfeditserver.app:app
    ```
 
-4. 配置环境变量（可选）
-   创建`.env`文件，添加以下内容：
-   ```
-   REDIS_URL=redis://localhost:6379/0
-   CLEAN_PASSWORD=your_secure_password
-   ```
+## 项目结构
 
-5. 启动Celery Worker
-   ```bash
-   # 在项目根目录下运行
-   celery -A pdfeditserver.celery_app worker --loglevel=info
-   ```
-
-6. 启动Celery Beat（用于定时任务）
-   ```bash
-   celery -A pdfeditserver.celery_app beat --loglevel=info
-   ```
-
-7. 运行Flask应用
-   ```bash
-   python -m pdfeditserver.app
-   ```
-
-8. 在浏览器中访问
-   ```
-   http://localhost:9000
-   ```
+```
+pdfeditserver/
+├── docker-compose.yml      # Docker编排配置
+├── Dockerfile             # Docker构建文件
+├── nginx.conf            # Nginx配置
+├── supervisord.conf      # Supervisor配置
+├── requirements.txt      # Python依赖
+├── pdfeditserver/        # 主应用目录
+│   ├── app.py           # Flask应用
+│   ├── celery_app.py    # Celery配置
+│   ├── tasks.py         # Celery任务
+│   ├── pdfedits.py      # PDF处理逻辑
+│   ├── static/          # 静态文件
+│   ├── templates/       # HTML模板
+│   └── uploads/         # 上传文件目录
+└── .env                 # 环境变量
+```
 
 ## 使用方法
 
@@ -82,42 +143,21 @@
 4. 等待处理完成
 5. 下载处理后的文件
 
-## 生产环境部署
+## 配置说明
 
-对于生产环境，建议：
+### 环境变量
 
-1. 使用Gunicorn或uWSGI作为WSGI服务器
-2. 使用Nginx作为反向代理
-3. 使用Supervisor管理Celery Worker和Beat进程
-4. 使用专用的Redis实例作为消息代理
-5. 考虑使用Redis或数据库存储任务状态，而不是内存字典
+- `REDIS_URL`: Redis连接URL
+- `CELERY_BROKER_URL`: Celery消息代理URL
+- `CELERY_RESULT_BACKEND`: Celery结果后端URL
+- `CLEAN_PASSWORD`: 清理API密码
 
-示例Supervisor配置：
-```ini
-[program:pdfedit_worker]
-command=/path/to/venv/bin/celery -A pdfeditserver.celery_app worker --loglevel=info
-directory=/path/to/pdfeditserver
-user=www-data
-numprocs=1
-stdout_logfile=/var/log/pdfedit_worker.log
-stderr_logfile=/var/log/pdfedit_worker_error.log
-autostart=true
-autorestart=true
-startsecs=10
-stopwaitsecs=600
+### Docker服务
 
-[program:pdfedit_beat]
-command=/path/to/venv/bin/celery -A pdfeditserver.celery_app beat --loglevel=info
-directory=/path/to/pdfeditserver
-user=www-data
-numprocs=1
-stdout_logfile=/var/log/pdfedit_beat.log
-stderr_logfile=/var/log/pdfedit_beat_error.log
-autostart=true
-autorestart=true
-startsecs=10
-stopwaitsecs=10
-```
+- `nginx`: 反向代理和静态文件服务
+- `app`: Flask应用（Gunicorn）
+- `redis`: 消息队列和结果存储
+- `celery`: Celery worker和beat进程（Supervisor管理）
 
 ## 注意事项
 
@@ -125,7 +165,12 @@ stopwaitsecs=10
 - 仅支持PDF文件格式
 - 页面号从1开始计数
 - 处理后的文件会在24小时后自动删除
-- 确保Redis服务器正常运行，否则任务队列将无法工作
+- Docker部署会自动处理依赖和服务管理
+- 生产环境部署建议：
+  - 配置SSL证书
+  - 调整Gunicorn和Nginx参数
+  - 设置适当的日志轮转
+  - 配置监控告警
 
 ## 未来计划
 
@@ -133,7 +178,27 @@ stopwaitsecs=10
 - 支持PDF预览
 - 添加用户认证系统
 - 提供API接口
-- 使用数据库存储任务状态，提高可靠性
+- 添加容器健康检查
+- 集成CI/CD流程
+- 添加Prometheus监控
+- 支持水平扩展
+
+## 故障排除
+
+1. 容器无法启动
+   ```bash
+   # 检查容器日志
+   docker-compose logs [service_name]
+   ```
+
+2. 文件上传失败
+   - 检查nginx.conf中的client_max_body_size设置
+   - 确认uploads目录权限正确
+
+3. 任务处理失败
+   - 检查Redis连接
+   - 查看Celery worker日志
+   - 确认文件权限设置
 
 ## 许可证
 
